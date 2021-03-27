@@ -10,12 +10,14 @@ import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.mail.MailException;
 import cn.hutool.extra.mail.MailUtil;
+import cn.hutool.extra.servlet.ServletUtil;
 import cn.hutool.http.HttpStatus;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.vocab85.rds.network.AliOSS;
 import com.vocab85.rds.network.DBM;
+import com.vocab85.rds.network.TestBaiduTranslate;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -36,8 +38,9 @@ import javax.servlet.http.HttpSession;
 @WebServlet(name = "Servlet", urlPatterns =
 {
     "/Login", "/GetUserGroups", "/CreateGroup", "/GetGroupItem", "/ChangeList", "/UpdateGroup", "/DeleteGroup", "/ChatBot",
-    "/Logout", "/Register", "/Verify", "/ForgetPassword", "/PasswordRecovery","/PasswordRecoveryPage"
-   
+    "/Logout", "/Register", "/Verify", "/ForgetPassword", "/PasswordRecovery", "/PasswordRecoveryPage",
+    "/GetLanguage", "/Translate"
+
 }, loadOnStartup = 1)
 public class Servlet extends HttpServlet
 {
@@ -134,10 +137,32 @@ public class Servlet extends HttpServlet
             case "/PasswordRecoveryPage":
                 processPasswordRecoveryPageGET(request, response);
                 break;
-                
+
             default:
                 processRequest(request, response);
                 break;
+        }
+    }
+
+    protected void processGetLanguagePOST(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException
+    {
+        String ua = req.getHeader("X-Requested-By");
+        resp.setContentType("application/json");
+        resp.setCharacterEncoding("utf-8");
+        try (PrintWriter writer = resp.getWriter())
+        {
+            if (ua.equals("SimpleMusicPlayer"))
+            {
+                JSONObject jsonr = JSONUtil.parseObj(ServletUtil.getBody(req));
+                String q = jsonr.getStr("q");
+                writer.write(TestBaiduTranslate.getSourceLanguageJSONStr(q));
+            } else
+            {
+                JSONObject jsonr = JSONUtil.createObj();
+                jsonr.putOnce("error_code", 401);
+                jsonr.putOnce("error_msg", "暂时不支持该客户端！");
+                writer.write(jsonr.toStringPretty());
+            }
         }
     }
 
@@ -149,7 +174,7 @@ public class Servlet extends HttpServlet
 
     protected void processPasswordRecoveryPagePOST(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException
     {
-       
+
         HttpSession session = req.getSession();
         String password = req.getParameter("password");
         String bash = req.getParameter("bash");
@@ -190,8 +215,7 @@ public class Servlet extends HttpServlet
         if (StrUtil.isEmpty(email))
         {
             putCodeMsg(json, 400, "电子邮件地址不能为空！");
-        } 
-        else
+        } else
         {
             try (DBM db = DBM.getDefaultInstance())
             {
@@ -210,11 +234,11 @@ public class Servlet extends HttpServlet
                 {
                     putCodeMsg(json, 400, "经查，该邮箱未注册。");
                 }
-            } catch (SQLException|ClassNotFoundException e)
+            } catch (SQLException | ClassNotFoundException e)
             {
                 dbError(json);
                 e.printStackTrace();
-            }catch (MailException me)
+            } catch (MailException me)
             {
                 mailError(json);
             }
@@ -306,11 +330,10 @@ public class Servlet extends HttpServlet
                         if (db.isEmailExists(user.getEmail()))
                         {
                             putCodeMsg(json, HttpStatus.HTTP_BAD_REQUEST, "该邮箱已被注册，请换一个邮箱注册");
-                        } else if(db.isUsernameExists(data))
+                        } else if (db.isUsernameExists(data))
                         {
                             putCodeMsg(json, HttpStatus.HTTP_BAD_REQUEST, "该用户名已被注册，请换一个用户名注册");
-                        }
-                        else
+                        } else
                         {
                             successMsg(json);
                             String bash = RandomUtil.randomString(60);
@@ -321,13 +344,12 @@ public class Servlet extends HttpServlet
 
                         }
 
-                    } catch(SQLException|ClassNotFoundException sqle)
+                    } catch (SQLException | ClassNotFoundException sqle)
                     {
                         dbError(json);
                         sqle.printStackTrace();
                         AliOSS.logError(sqle);
-                    }
-                    catch (cn.hutool.extra.mail.MailException me)
+                    } catch (cn.hutool.extra.mail.MailException me)
                     {
                         mailError(json);
                         me.printStackTrace();
@@ -813,6 +835,9 @@ public class Servlet extends HttpServlet
             case "/PasswordRecoveryPage":
                 processPasswordRecoveryPagePOST(request, response);
                 break;
+            case "/GetLanguage":
+                processGetLanguagePOST(request, response);
+                break;
             default:
                 JSONObject json = JSONUtil.createObj();
                 response.setStatus(405);
@@ -878,6 +903,7 @@ public class Servlet extends HttpServlet
     {
         putCodeMsg(json, HttpStatus.HTTP_BAD_REQUEST, "邮箱地址不存在，请检查重新输入您的有效邮箱！");
     }
+
     /**
      * Get the auth token from user. The "X-token" header usually.
      *

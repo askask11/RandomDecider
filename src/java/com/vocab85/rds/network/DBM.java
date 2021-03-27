@@ -28,7 +28,7 @@ import java.util.logging.Logger;
 public class DBM implements AutoCloseable
 {
 
-    java.sql.Connection dbConn;
+    private java.sql.Connection dbConn;
 
     public DBM(String dbName, String host, String dbUsername, String dbPassword, boolean useSSL) throws SQLException, ClassNotFoundException
     {
